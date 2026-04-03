@@ -1,0 +1,68 @@
+# tango.yaml — root configuration for the tango CLI
+#
+# Environment variable overrides:
+#   TANGO_REGISTRY_HOST       — override registry.host
+#   TANGO_REGISTRY_NAMESPACE  — override registry.namespace
+#   TANGO_REGISTRY_USER       — override registry.username
+#   TANGO_REGISTRY_PASSWORD   — registry password / token (never put in this file)
+#   TANGO_CONFIG              — path to this file
+#   TANGO_PACKAGE             — active package
+#   TANGO_DRY_RUN             — enable dry-run mode
+#   TANGO_EVENT               — CI event (commit | pr | merge)
+#   TANGO_SHA                 — git commit SHA
+#   TANGO_PR_NUMBER           — pull-request number
+
+registry:
+  host: ghcr.io
+  namespace: my-org
+  # username: my-bot  # prefer TANGO_REGISTRY_USER env var
+
+defaults:
+  tags:
+    sha_prefix: "sha-"
+    pr_prefix: "pr-"
+    main_tag: "main"
+    latest_tag: "latest"
+    publish_latest_on_merge: true
+
+# Monorepo packages — each can override registry and tag defaults
+packages:
+  api:
+    image:
+      name: api
+      context: ./services/api
+      dockerfile: ./services/api/Dockerfile
+      platforms:
+        - linux/amd64
+        - linux/arm64
+      build_args:
+        NODE_ENV: production
+      labels:
+        org.opencontainers.image.source: https://github.com/my-org/my-repo
+
+  worker:
+    image:
+      name: worker
+      context: ./services/worker
+      dockerfile: ./services/worker/Dockerfile
+      platforms:
+        - linux/amd64
+      build_args:
+        NODE_ENV: production
+
+  frontend:
+    image:
+      name: frontend
+      context: ./frontend
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    # Override registry for this package only
+    registry:
+      host: registry.hub.docker.com
+      namespace: myorg
+    # Override tag defaults for this package
+    defaults:
+      tags:
+        publish_latest_on_merge: false
+        main_tag: "stable"
