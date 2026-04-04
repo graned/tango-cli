@@ -128,17 +128,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Dance (build + promote) all packages
+      - name: Promote all packages to main/latest
         env:
           TANGO_REGISTRY_HOST: ${{ env.REGISTRY }}
           TANGO_REGISTRY_NAMESPACE: ${{ env.IMAGE_NAMESPACE }}
           TANGO_SHA: ${{ github.sha }}
         run: |
           for package in api worker frontend; do
-            echo "=== Dancing $package ==="
-            ./bin/tango --package "$package" dance \
-              --event merge \
+            echo "=== Promoting $package ==="
+            ./bin/tango --package "$package" promote \
               --sha "$TANGO_SHA" \
+              --target-tag main \
+              --target-tag latest \
               --json
           done
 

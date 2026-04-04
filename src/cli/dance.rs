@@ -35,10 +35,15 @@ pub struct DanceArgs {
     #[arg(long)]
     pub platform: Vec<String>,
 
-    /// For merge events: the sha-tag of the already-built image to promote from.
-    /// If not set, tango will build first, then promote.
+    /// For merge events: full source reference to promote from (tag or digest).
+    /// If omitted, the sha-tag derived from --sha is used (e.g. sha-abc123def456).
     #[arg(long)]
     pub promote_from_sha: Option<String>,
+
+    /// For merge events: force a fresh build instead of promoting the existing sha-tag.
+    /// Use only if the image was never built for this SHA (e.g. hotfix directly on main).
+    #[arg(long)]
+    pub force_build: bool,
 }
 
 pub async fn run(ctx: CommandContext, args: DanceArgs) -> Result<()> {
@@ -96,39 +101,13 @@ pub async fn run(ctx: CommandContext, args: DanceArgs) -> Result<()> {
 
     match &args.event {
         Event::Merge => {
-            // For merge: either promote from an existing sha-tag, or build fresh then promote.
             let sha_tag = tags.sha_tag.as_deref().unwrap_or("latest");
             primary_ref = base_ref.clone().with_tag(sha_tag);
 
-            if let Some(promote_from) = &args.promote_from_sha {
-                // Caller already has the sha-tagged image — just retag it.
+            if args.force_build {
+                // Explicit opt-in: build fresh then promote (e.g. hotfix directly on main).
                 info!(
-                    "Merge event: promoting existing image {} to mutable tags",
-                    promote_from
-                );
-                let source: ImageRef = promote_from.parse()?;
-
-                let mutable_refs: Vec<ImageRef> = tags
-                    .all
-                    .iter()
-                    .filter(|t| Some(*t) != tags.sha_tag.as_ref())
-                    .map(|t| base_ref.clone().with_tag(t))
-                    .collect();
-
-                // Also tag to the sha-tag for traceability (idempotent if already exists).
-                let all_targets: Vec<ImageRef> = std::iter::once(primary_ref.clone())
-                    .chain(mutable_refs)
-                    .collect();
-
-                client.tag_image(&source, &all_targets, ctx.dry_run).await?;
-                digest = client
-                    .get_digest(&primary_ref)
-                    .await
-                    .unwrap_or_else(|_| "sha256:unknown".into());
-            } else {
-                // Build first with sha-tag, then retag to mutable tags.
-                info!(
-                    "Merge event: building and pushing {} then promoting to mutable tags",
+                    "Merge event (--force-build): building {} then promoting to mutable tags",
                     primary_ref
                 );
                 digest = client
@@ -144,19 +123,53 @@ pub async fn run(ctx: CommandContext, args: DanceArgs) -> Result<()> {
                         ctx.dry_run,
                     )
                     .await?;
+            } else {
+                // Default: promote the already-built image — no rebuild.
+                // Source is either an explicit --promote-from-sha ref or the sha-tag
+                // derived from --sha (e.g. sha-abc123def456).
+                let source: ImageRef = if let Some(src) = &args.promote_from_sha {
+                    src.parse()?
+                } else {
+                    primary_ref.clone()
+                };
 
-                let mutable_refs: Vec<ImageRef> = tags
+                info!(
+                    "Merge event: promoting {} → mutable tags (no rebuild)",
+                    source
+                );
+
+                let mutable_tags: Vec<ImageRef> = tags
                     .all
                     .iter()
                     .filter(|t| Some(*t) != tags.sha_tag.as_ref())
                     .map(|t| base_ref.clone().with_tag(t))
                     .collect();
 
-                if !mutable_refs.is_empty() {
-                    client
-                        .tag_image(&primary_ref, &mutable_refs, ctx.dry_run)
-                        .await?;
+                if mutable_tags.is_empty() {
+                    anyhow::bail!(
+                        "No mutable tags to promote to. Check your tag config (main_tag, latest_tag)."
+                    );
                 }
+
+                client.tag_image(&source, &mutable_tags, ctx.dry_run).await?;
+                digest = client
+                    .get_digest(&primary_ref)
+                    .await
+                    .unwrap_or_else(|_| "sha256:unknown".into());
+                return output_result(ctx, base_ref, tags, digest);
+            }
+
+            let mutable_refs: Vec<ImageRef> = tags
+                .all
+                .iter()
+                .filter(|t| Some(*t) != tags.sha_tag.as_ref())
+                .map(|t| base_ref.clone().with_tag(t))
+                .collect();
+
+            if !mutable_refs.is_empty() {
+                client
+                    .tag_image(&primary_ref, &mutable_refs, ctx.dry_run)
+                    .await?;
             }
         }
 
@@ -198,8 +211,16 @@ pub async fn run(ctx: CommandContext, args: DanceArgs) -> Result<()> {
         }
     }
 
+    output_result(ctx, base_ref, tags, digest)
+}
+
+fn output_result(
+    ctx: CommandContext,
+    base_ref: ImageRef,
+    tags: crate::core::tags::TagSet,
+    digest: String,
+) -> Result<()> {
     let output = json!({
-        "event": format!("{:?}", args.event).to_lowercase(),
         "image": base_ref.repository(),
         "sha_tag": tags.sha_tag,
         "pr_tag": tags.pr_tag,
@@ -214,7 +235,6 @@ pub async fn run(ctx: CommandContext, args: DanceArgs) -> Result<()> {
     if ctx.json {
         println!("{}", serde_json::to_string_pretty(&output)?);
     } else {
-        println!("Dance complete for event {:?}", args.event);
         println!("Image: {}@{}", base_ref.repository(), digest);
         println!("Tags:  {}", tags.all.join(", "));
     }
