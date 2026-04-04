@@ -2,9 +2,9 @@ use anyhow::{bail, Result};
 use clap::Args;
 use serde_json::json;
 
+use super::CommandContext;
 use crate::core::image_ref::ImageRef;
 use crate::registry::{DockerClient, RegistryClient};
-use super::CommandContext;
 
 #[derive(Args, Debug)]
 pub struct ResolveArgs {
@@ -40,11 +40,9 @@ pub async fn run(ctx: CommandContext, args: ResolveArgs) -> Result<()> {
         let image_name = if let Some(n) = &args.image {
             n.clone()
         } else {
-            cfg.image.as_ref()
-                .map(|i| i.name.clone())
-                .ok_or_else(|| anyhow::anyhow!(
-                    "No image name configured. Specify --image or --package."
-                ))?
+            cfg.image.as_ref().map(|i| i.name.clone()).ok_or_else(|| {
+                anyhow::anyhow!("No image name configured. Specify --image or --package.")
+            })?
         };
         ImageRef::new(registry_host, namespace, &image_name).with_tag(tag)
     } else {

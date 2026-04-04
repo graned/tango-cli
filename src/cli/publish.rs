@@ -2,9 +2,12 @@ use anyhow::Result;
 use clap::Args;
 use serde_json::json;
 
-use crate::core::{image_ref::ImageRef, tags::{Event, TagSet}};
-use crate::registry::{DockerClient, RegistryClient};
 use super::CommandContext;
+use crate::core::{
+    image_ref::ImageRef,
+    tags::{Event, TagSet},
+};
+use crate::registry::{DockerClient, RegistryClient};
 
 #[derive(Args, Debug)]
 pub struct PublishArgs {
@@ -35,16 +38,17 @@ pub struct PublishArgs {
 
 pub async fn run(ctx: CommandContext, args: PublishArgs) -> Result<()> {
     let cfg = &ctx.config;
-    let image_cfg = cfg.image.as_ref()
-        .ok_or_else(|| anyhow::anyhow!(
-            "No image config found. Specify --package or ensure image config is set."
-        ))?;
+    let image_cfg = cfg.image.as_ref().ok_or_else(|| {
+        anyhow::anyhow!("No image config found. Specify --package or ensure image config is set.")
+    })?;
 
     let tags = TagSet::generate(&args.event, &args.sha, args.pr, &cfg.tags);
 
     let base_ref = ImageRef::new(&cfg.registry.host, &cfg.registry.namespace, &image_cfg.name);
 
-    let primary_ref = base_ref.clone().with_tag(tags.sha_tag.as_deref().unwrap_or("latest"));
+    let primary_ref = base_ref
+        .clone()
+        .with_tag(tags.sha_tag.as_deref().unwrap_or("latest"));
 
     let client = DockerClient::new(
         cfg.registry.username.clone(),
@@ -52,8 +56,13 @@ pub async fn run(ctx: CommandContext, args: PublishArgs) -> Result<()> {
     );
 
     // Parse extra build args from CLI
-    let mut build_args: Vec<(String, String)> = args.build_args.iter()
-        .filter_map(|a| a.split_once('=').map(|(k, v)| (k.to_string(), v.to_string())))
+    let mut build_args: Vec<(String, String)> = args
+        .build_args
+        .iter()
+        .filter_map(|a| {
+            a.split_once('=')
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+        })
         .collect();
     // Merge image-config build args (CLI overrides config)
     for (k, v) in &image_cfg.build_args {
@@ -62,8 +71,13 @@ pub async fn run(ctx: CommandContext, args: PublishArgs) -> Result<()> {
         }
     }
 
-    let mut labels: Vec<(String, String)> = args.labels.iter()
-        .filter_map(|l| l.split_once('=').map(|(k, v)| (k.to_string(), v.to_string())))
+    let mut labels: Vec<(String, String)> = args
+        .labels
+        .iter()
+        .filter_map(|l| {
+            l.split_once('=')
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+        })
         .collect();
     for (k, v) in &image_cfg.labels {
         if !labels.iter().any(|(ck, _)| ck == k) {
@@ -78,24 +92,30 @@ pub async fn run(ctx: CommandContext, args: PublishArgs) -> Result<()> {
     };
 
     let dockerfile = image_cfg.dockerfile.as_deref();
-    let digest = client.push_image(
-        &primary_ref,
-        &image_cfg.context,
-        dockerfile,
-        &build_args,
-        &labels,
-        &platforms,
-        ctx.dry_run,
-    ).await?;
+    let digest = client
+        .push_image(
+            &primary_ref,
+            &image_cfg.context,
+            dockerfile,
+            &build_args,
+            &labels,
+            &platforms,
+            ctx.dry_run,
+        )
+        .await?;
 
     // Apply additional mutable tags
-    let additional_tags: Vec<ImageRef> = tags.all.iter()
+    let additional_tags: Vec<ImageRef> = tags
+        .all
+        .iter()
         .filter(|t| Some(*t) != tags.sha_tag.as_ref())
         .map(|t| base_ref.clone().with_tag(t))
         .collect();
 
     if !additional_tags.is_empty() {
-        client.tag_image(&primary_ref, &additional_tags, ctx.dry_run).await?;
+        client
+            .tag_image(&primary_ref, &additional_tags, ctx.dry_run)
+            .await?;
     }
 
     let output = json!({

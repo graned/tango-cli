@@ -1,8 +1,8 @@
 pub mod client;
 
+use crate::core::image_ref::ImageRef;
 use anyhow::Result;
 use async_trait::async_trait;
-use crate::core::image_ref::ImageRef;
 
 #[async_trait]
 pub trait RegistryClient: Send + Sync {
@@ -19,12 +19,8 @@ pub trait RegistryClient: Send + Sync {
     ) -> Result<String>;
 
     /// Retag an existing image (by source tag or digest) to new tags — no rebuild
-    async fn tag_image(
-        &self,
-        source: &ImageRef,
-        targets: &[ImageRef],
-        dry_run: bool,
-    ) -> Result<()>;
+    async fn tag_image(&self, source: &ImageRef, targets: &[ImageRef], dry_run: bool)
+        -> Result<()>;
 
     /// Resolve a tag to its digest
     async fn get_digest(&self, image_ref: &ImageRef) -> Result<String>;

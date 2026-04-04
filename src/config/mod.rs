@@ -1,7 +1,7 @@
 pub mod loader;
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct TangoConfig {
@@ -52,11 +52,21 @@ impl Default for TagDefaults {
     }
 }
 
-fn default_sha_prefix() -> String { "sha-".into() }
-fn default_pr_prefix() -> String { "pr-".into() }
-fn default_main_tag() -> String { "main".into() }
-fn default_latest_tag() -> String { "latest".into() }
-fn default_true() -> bool { true }
+fn default_sha_prefix() -> String {
+    "sha-".into()
+}
+fn default_pr_prefix() -> String {
+    "pr-".into()
+}
+fn default_main_tag() -> String {
+    "main".into()
+}
+fn default_latest_tag() -> String {
+    "latest".into()
+}
+fn default_true() -> bool {
+    true
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct PackageConfig {

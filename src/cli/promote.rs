@@ -2,9 +2,9 @@ use anyhow::{bail, Result};
 use clap::Args;
 use serde_json::json;
 
+use super::CommandContext;
 use crate::core::image_ref::ImageRef;
 use crate::registry::{DockerClient, RegistryClient};
-use super::CommandContext;
 
 #[derive(Args, Debug)]
 pub struct PromoteArgs {
@@ -42,11 +42,11 @@ pub async fn run(ctx: CommandContext, args: PromoteArgs) -> Result<()> {
     let image_name = if let Some(n) = &args.image {
         n.clone()
     } else {
-        cfg.image.as_ref()
-            .map(|i| i.name.clone())
-            .ok_or_else(|| anyhow::anyhow!(
+        cfg.image.as_ref().map(|i| i.name.clone()).ok_or_else(|| {
+            anyhow::anyhow!(
                 "No image name found. Specify --image, --package, or configure an image."
-            ))?
+            )
+        })?
     };
 
     // Resolve source reference
@@ -65,7 +65,9 @@ pub async fn run(ctx: CommandContext, args: PromoteArgs) -> Result<()> {
     }
 
     let base_ref = ImageRef::new(registry_host, namespace, &image_name);
-    let target_refs: Vec<ImageRef> = args.target_tags.iter()
+    let target_refs: Vec<ImageRef> = args
+        .target_tags
+        .iter()
         .map(|t| base_ref.clone().with_tag(t))
         .collect();
 
@@ -74,7 +76,9 @@ pub async fn run(ctx: CommandContext, args: PromoteArgs) -> Result<()> {
         std::env::var("TANGO_REGISTRY_PASSWORD").ok(),
     );
 
-    client.tag_image(&source_ref, &target_refs, ctx.dry_run).await?;
+    client
+        .tag_image(&source_ref, &target_refs, ctx.dry_run)
+        .await?;
 
     let output = json!({
         "source": source_ref.to_string(),

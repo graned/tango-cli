@@ -28,11 +28,15 @@ pub fn load(config_path: Option<&str>, package: Option<&str>) -> Result<Resolved
 
     // Merge package config if specified
     let (image, package_name, tags) = if let Some(pkg) = package {
-        let pkg_cfg = raw.packages.get(pkg)
+        let pkg_cfg = raw
+            .packages
+            .get(pkg)
             .with_context(|| format!("Package '{}' not found in config", pkg))?;
         let pkg_registry = pkg_cfg.registry.as_ref().unwrap_or(&registry);
         registry = pkg_registry.clone();
-        let tags = pkg_cfg.defaults.as_ref()
+        let tags = pkg_cfg
+            .defaults
+            .as_ref()
             .map(|d| d.tags.clone())
             .unwrap_or_else(|| raw.defaults.tags.clone());
         (Some(pkg_cfg.image.clone()), Some(pkg.to_string()), tags)
@@ -48,5 +52,11 @@ pub fn load(config_path: Option<&str>, package: Option<&str>) -> Result<Resolved
         registry.namespace = ns;
     }
 
-    Ok(ResolvedConfig { registry, tags, image, package_name, raw })
+    Ok(ResolvedConfig {
+        registry,
+        tags,
+        image,
+        package_name,
+        raw,
+    })
 }

@@ -68,7 +68,10 @@ impl std::str::FromStr for ImageRef {
         if let Some((repo, digest)) = s.split_once('@') {
             let parts: Vec<&str> = repo.splitn(3, '/').collect();
             if parts.len() != 3 {
-                bail!("Invalid image ref '{}': expected registry/namespace/name", s);
+                bail!(
+                    "Invalid image ref '{}': expected registry/namespace/name",
+                    s
+                );
             }
             return Ok(ImageRef {
                 registry: parts[0].to_string(),
@@ -97,7 +100,10 @@ impl std::str::FromStr for ImageRef {
 
         let parts: Vec<&str> = repo.splitn(3, '/').collect();
         if parts.len() != 3 {
-            bail!("Invalid image ref '{}': expected registry/namespace/name[:tag]", s);
+            bail!(
+                "Invalid image ref '{}': expected registry/namespace/name[:tag]",
+                s
+            );
         }
         Ok(ImageRef {
             registry: parts[0].to_string(),

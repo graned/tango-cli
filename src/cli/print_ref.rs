@@ -2,11 +2,11 @@ use anyhow::{bail, Result};
 use clap::Args;
 use serde_json::json;
 
+use super::CommandContext;
 use crate::core::{
     image_ref::ImageRef,
     tags::{Event, TagSet},
 };
-use super::CommandContext;
 
 #[derive(Args, Debug)]
 pub struct PrintRefArgs {
@@ -55,11 +55,9 @@ pub async fn run(ctx: CommandContext, args: PrintRefArgs) -> Result<()> {
     let image_name = if let Some(n) = &args.image {
         n.clone()
     } else {
-        cfg.image.as_ref()
-            .map(|i| i.name.clone())
-            .ok_or_else(|| anyhow::anyhow!(
-                "No image name configured. Specify --image or --package."
-            ))?
+        cfg.image.as_ref().map(|i| i.name.clone()).ok_or_else(|| {
+            anyhow::anyhow!("No image name configured. Specify --image or --package.")
+        })?
     };
 
     let base_ref = ImageRef::new(registry_host, namespace, &image_name);
@@ -77,9 +75,13 @@ pub async fn run(ctx: CommandContext, args: PrintRefArgs) -> Result<()> {
             "latest" => tag_set.latest_tag.as_deref(),
             other => bail!("Unknown --select value '{}': use sha|pr|main|latest", other),
         };
-        let tag = selected_tag.ok_or_else(|| anyhow::anyhow!(
-            "Tag '{}' is not available for event '{:?}'", args.select, event
-        ))?;
+        let tag = selected_tag.ok_or_else(|| {
+            anyhow::anyhow!(
+                "Tag '{}' is not available for event '{:?}'",
+                args.select,
+                event
+            )
+        })?;
         base_ref.with_tag(tag)
     } else {
         bail!("Specify --tag, --digest, or both --event and --sha");

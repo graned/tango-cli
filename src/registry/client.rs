@@ -3,8 +3,8 @@ use async_trait::async_trait;
 use tokio::process::Command;
 use tracing::{debug, info, warn};
 
-use crate::core::image_ref::ImageRef;
 use super::RegistryClient;
+use crate::core::image_ref::ImageRef;
 
 /// A registry client that delegates to the local `docker` CLI.
 /// Works with any registry (Docker Hub, ECR, GCR, GHCR, etc.) because
@@ -37,7 +37,9 @@ impl DockerClient {
         if let Some(stdin) = child.stdin.take() {
             use tokio::io::AsyncWriteExt;
             let mut stdin = stdin;
-            stdin.write_all(pass.as_bytes()).await
+            stdin
+                .write_all(pass.as_bytes())
+                .await
                 .context("Failed to write password to docker login stdin")?;
         }
 
@@ -66,23 +68,30 @@ impl DockerClient {
     async fn inspect_digest(image_ref: &str) -> Result<String> {
         let format_arg = "{{json .Manifest}}";
         let (stdout, stderr, ok) = Self::run_docker(&[
-            "buildx", "imagetools", "inspect",
-            "--format", format_arg,
+            "buildx",
+            "imagetools",
+            "inspect",
+            "--format",
+            format_arg,
             image_ref,
-        ]).await?;
+        ])
+        .await?;
 
         if !ok {
-            bail!("docker buildx imagetools inspect failed for {}: {}", image_ref, stderr.trim());
+            bail!(
+                "docker buildx imagetools inspect failed for {}: {}",
+                image_ref,
+                stderr.trim()
+            );
         }
 
         // The JSON contains a "digest" field at the top level
         let v: serde_json::Value = serde_json::from_str(stdout.trim())
             .with_context(|| format!("Failed to parse imagetools inspect output: {}", stdout))?;
 
-        v["digest"]
-            .as_str()
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("No 'digest' field in imagetools inspect output: {}", stdout))
+        v["digest"].as_str().map(|s| s.to_string()).ok_or_else(|| {
+            anyhow::anyhow!("No 'digest' field in imagetools inspect output: {}", stdout)
+        })
     }
 }
 
@@ -145,15 +154,21 @@ impl RegistryClient for DockerClient {
             debug!("build stderr: {}", stderr);
         }
         if !ok {
-            bail!("docker buildx build failed for {}: {}", ref_str, stderr.trim());
+            bail!(
+                "docker buildx build failed for {}: {}",
+                ref_str,
+                stderr.trim()
+            );
         }
 
         // Retrieve digest after push
-        let digest = Self::inspect_digest(&ref_str).await
-            .unwrap_or_else(|e| {
-                warn!("Could not retrieve digest after push ({}), using placeholder", e);
-                "sha256:unknown".to_string()
-            });
+        let digest = Self::inspect_digest(&ref_str).await.unwrap_or_else(|e| {
+            warn!(
+                "Could not retrieve digest after push ({}), using placeholder",
+                e
+            );
+            "sha256:unknown".to_string()
+        });
 
         Ok(digest)
     }
@@ -170,21 +185,30 @@ impl RegistryClient for DockerClient {
             let target_str = target.to_string();
 
             if dry_run {
-                info!("[dry-run] docker buildx imagetools create --tag {} {}", target_str, source_str);
+                info!(
+                    "[dry-run] docker buildx imagetools create --tag {} {}",
+                    target_str, source_str
+                );
                 continue;
             }
 
             info!("Retagging {} → {}", source_str, target_str);
             let (_, stderr, ok) = Self::run_docker(&[
-                "buildx", "imagetools", "create",
-                "--tag", &target_str,
+                "buildx",
+                "imagetools",
+                "create",
+                "--tag",
+                &target_str,
                 &source_str,
-            ]).await?;
+            ])
+            .await?;
 
             if !ok {
                 bail!(
                     "docker buildx imagetools create failed ({} → {}): {}",
-                    source_str, target_str, stderr.trim()
+                    source_str,
+                    target_str,
+                    stderr.trim()
                 );
             }
         }
@@ -202,7 +226,11 @@ impl RegistryClient for DockerClient {
         debug!("Checking existence of {}", ref_str);
         let (_, stderr, ok) = Self::run_docker(&["manifest", "inspect", &ref_str]).await?;
         if !ok {
-            debug!("manifest inspect returned non-zero for {}: {}", ref_str, stderr.trim());
+            debug!(
+                "manifest inspect returned non-zero for {}: {}",
+                ref_str,
+                stderr.trim()
+            );
         }
         Ok(ok)
     }

@@ -11,7 +11,11 @@ use clap::{Parser, Subcommand};
 use crate::config;
 
 #[derive(Parser, Debug)]
-#[command(name = "tango", about = "Registry-agnostic artifact orchestration CLI", version)]
+#[command(
+    name = "tango",
+    about = "Registry-agnostic artifact orchestration CLI",
+    version
+)]
 pub struct Cli {
     /// Path to config file (default: tango.yaml)
     #[arg(long, short = 'c', global = true, env = "TANGO_CONFIG")]

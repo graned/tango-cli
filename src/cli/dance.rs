@@ -3,10 +3,10 @@ use clap::Args;
 use serde_json::json;
 use tracing::info;
 
-use crate::core::tags::{Event, TagSet};
-use crate::core::image_ref::ImageRef;
-use crate::registry::{DockerClient, RegistryClient};
 use super::CommandContext;
+use crate::core::image_ref::ImageRef;
+use crate::core::tags::{Event, TagSet};
+use crate::registry::{DockerClient, RegistryClient};
 
 /// DanceArgs combines what's needed for both publish and promote flows.
 #[derive(Args, Debug)]
@@ -44,10 +44,9 @@ pub struct DanceArgs {
 pub async fn run(ctx: CommandContext, args: DanceArgs) -> Result<()> {
     let cfg = &ctx.config;
 
-    let image_cfg = cfg.image.as_ref()
-        .ok_or_else(|| anyhow::anyhow!(
-            "No image config found. Specify --package or ensure image config is set."
-        ))?;
+    let image_cfg = cfg.image.as_ref().ok_or_else(|| {
+        anyhow::anyhow!("No image config found. Specify --package or ensure image config is set.")
+    })?;
 
     let tags = TagSet::generate(&args.event, &args.sha, args.pr, &cfg.tags);
     let base_ref = ImageRef::new(&cfg.registry.host, &cfg.registry.namespace, &image_cfg.name);
@@ -58,8 +57,13 @@ pub async fn run(ctx: CommandContext, args: DanceArgs) -> Result<()> {
     );
 
     // Parse build args
-    let mut build_args: Vec<(String, String)> = args.build_args.iter()
-        .filter_map(|a| a.split_once('=').map(|(k, v)| (k.to_string(), v.to_string())))
+    let mut build_args: Vec<(String, String)> = args
+        .build_args
+        .iter()
+        .filter_map(|a| {
+            a.split_once('=')
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+        })
         .collect();
     for (k, v) in &image_cfg.build_args {
         if !build_args.iter().any(|(ck, _)| ck == k) {
@@ -67,8 +71,13 @@ pub async fn run(ctx: CommandContext, args: DanceArgs) -> Result<()> {
         }
     }
 
-    let mut labels: Vec<(String, String)> = args.labels.iter()
-        .filter_map(|l| l.split_once('=').map(|(k, v)| (k.to_string(), v.to_string())))
+    let mut labels: Vec<(String, String)> = args
+        .labels
+        .iter()
+        .filter_map(|l| {
+            l.split_once('=')
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+        })
         .collect();
     for (k, v) in &image_cfg.labels {
         if !labels.iter().any(|(ck, _)| ck == k) {
@@ -93,10 +102,15 @@ pub async fn run(ctx: CommandContext, args: DanceArgs) -> Result<()> {
 
             if let Some(promote_from) = &args.promote_from_sha {
                 // Caller already has the sha-tagged image — just retag it.
-                info!("Merge event: promoting existing image {} to mutable tags", promote_from);
+                info!(
+                    "Merge event: promoting existing image {} to mutable tags",
+                    promote_from
+                );
                 let source: ImageRef = promote_from.parse()?;
 
-                let mutable_refs: Vec<ImageRef> = tags.all.iter()
+                let mutable_refs: Vec<ImageRef> = tags
+                    .all
+                    .iter()
                     .filter(|t| Some(*t) != tags.sha_tag.as_ref())
                     .map(|t| base_ref.clone().with_tag(t))
                     .collect();
@@ -107,27 +121,39 @@ pub async fn run(ctx: CommandContext, args: DanceArgs) -> Result<()> {
                     .collect();
 
                 client.tag_image(&source, &all_targets, ctx.dry_run).await?;
-                digest = client.get_digest(&primary_ref).await.unwrap_or_else(|_| "sha256:unknown".into());
+                digest = client
+                    .get_digest(&primary_ref)
+                    .await
+                    .unwrap_or_else(|_| "sha256:unknown".into());
             } else {
                 // Build first with sha-tag, then retag to mutable tags.
-                info!("Merge event: building and pushing {} then promoting to mutable tags", primary_ref);
-                digest = client.push_image(
-                    &primary_ref,
-                    &image_cfg.context,
-                    image_cfg.dockerfile.as_deref(),
-                    &build_args,
-                    &labels,
-                    &platforms,
-                    ctx.dry_run,
-                ).await?;
+                info!(
+                    "Merge event: building and pushing {} then promoting to mutable tags",
+                    primary_ref
+                );
+                digest = client
+                    .push_image(
+                        &primary_ref,
+                        &image_cfg.context,
+                        image_cfg.dockerfile.as_deref(),
+                        &build_args,
+                        &labels,
+                        &platforms,
+                        ctx.dry_run,
+                    )
+                    .await?;
 
-                let mutable_refs: Vec<ImageRef> = tags.all.iter()
+                let mutable_refs: Vec<ImageRef> = tags
+                    .all
+                    .iter()
                     .filter(|t| Some(*t) != tags.sha_tag.as_ref())
                     .map(|t| base_ref.clone().with_tag(t))
                     .collect();
 
                 if !mutable_refs.is_empty() {
-                    client.tag_image(&primary_ref, &mutable_refs, ctx.dry_run).await?;
+                    client
+                        .tag_image(&primary_ref, &mutable_refs, ctx.dry_run)
+                        .await?;
                 }
             }
         }
@@ -137,24 +163,33 @@ pub async fn run(ctx: CommandContext, args: DanceArgs) -> Result<()> {
             let sha_tag = tags.sha_tag.as_deref().unwrap_or("latest");
             primary_ref = base_ref.clone().with_tag(sha_tag);
 
-            info!("Publish event {:?}: building and pushing {}", args.event, primary_ref);
-            digest = client.push_image(
-                &primary_ref,
-                &image_cfg.context,
-                image_cfg.dockerfile.as_deref(),
-                &build_args,
-                &labels,
-                &platforms,
-                ctx.dry_run,
-            ).await?;
+            info!(
+                "Publish event {:?}: building and pushing {}",
+                args.event, primary_ref
+            );
+            digest = client
+                .push_image(
+                    &primary_ref,
+                    &image_cfg.context,
+                    image_cfg.dockerfile.as_deref(),
+                    &build_args,
+                    &labels,
+                    &platforms,
+                    ctx.dry_run,
+                )
+                .await?;
 
-            let extra_refs: Vec<ImageRef> = tags.all.iter()
+            let extra_refs: Vec<ImageRef> = tags
+                .all
+                .iter()
                 .filter(|t| Some(*t) != tags.sha_tag.as_ref())
                 .map(|t| base_ref.clone().with_tag(t))
                 .collect();
 
             if !extra_refs.is_empty() {
-                client.tag_image(&primary_ref, &extra_refs, ctx.dry_run).await?;
+                client
+                    .tag_image(&primary_ref, &extra_refs, ctx.dry_run)
+                    .await?;
             }
         }
     }

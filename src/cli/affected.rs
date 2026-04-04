@@ -28,7 +28,11 @@ pub async fn run(ctx: CommandContext, args: AffectedArgs) -> Result<()> {
     // Run git diff to get changed files
     debug!("Running: git diff --name-only {}..{}", args.base, args.head);
     let output = Command::new("git")
-        .args(["diff", "--name-only", &format!("{}..{}", args.base, args.head)])
+        .args([
+            "diff",
+            "--name-only",
+            &format!("{}..{}", args.base, args.head),
+        ])
         .output()
         .await
         .context("Failed to run git diff — is this a git repository?")?;

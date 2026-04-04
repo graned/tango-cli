@@ -60,11 +60,25 @@ impl TagSet {
         };
 
         let mut all = Vec::new();
-        if let Some(t) = &sha_tag { all.push(t.clone()); }
-        if let Some(t) = &pr_tag { all.push(t.clone()); }
-        if let Some(t) = &main_tag { all.push(t.clone()); }
-        if let Some(t) = &latest_tag { all.push(t.clone()); }
+        if let Some(t) = &sha_tag {
+            all.push(t.clone());
+        }
+        if let Some(t) = &pr_tag {
+            all.push(t.clone());
+        }
+        if let Some(t) = &main_tag {
+            all.push(t.clone());
+        }
+        if let Some(t) = &latest_tag {
+            all.push(t.clone());
+        }
 
-        TagSet { sha_tag, pr_tag, main_tag, latest_tag, all }
+        TagSet {
+            sha_tag,
+            pr_tag,
+            main_tag,
+            latest_tag,
+            all,
+        }
     }
 }
