@@ -4,17 +4,22 @@ use crate::core::image_ref::ImageRef;
 use anyhow::Result;
 use async_trait::async_trait;
 
+/// Options passed to `push_image` — grouped to stay within argument-count limits.
+pub struct BuildOptions<'a> {
+    pub context: &'a str,
+    pub dockerfile: Option<&'a str>,
+    pub build_args: &'a [(String, String)],
+    pub labels: &'a [(String, String)],
+    pub platforms: &'a [String],
+}
+
 #[async_trait]
 pub trait RegistryClient: Send + Sync {
-    /// Build and push an image, returning its digest
+    /// Build and push an image, returning its digest.
     async fn push_image(
         &self,
         image_ref: &ImageRef,
-        context: &str,
-        dockerfile: Option<&str>,
-        build_args: &[(String, String)],
-        labels: &[(String, String)],
-        platforms: &[String],
+        opts: BuildOptions<'_>,
         dry_run: bool,
     ) -> Result<String>;
 

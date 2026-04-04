@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use tokio::process::Command;
 use tracing::{debug, info, warn};
 
-use super::RegistryClient;
+use super::{BuildOptions, RegistryClient};
 use crate::core::image_ref::ImageRef;
 
 /// A registry client that delegates to the local `docker` CLI.
@@ -100,11 +100,7 @@ impl RegistryClient for DockerClient {
     async fn push_image(
         &self,
         image_ref: &ImageRef,
-        context: &str,
-        dockerfile: Option<&str>,
-        build_args: &[(String, String)],
-        labels: &[(String, String)],
-        platforms: &[String],
+        opts: BuildOptions<'_>,
         dry_run: bool,
     ) -> Result<String> {
         self.maybe_login(&image_ref.registry).await?;
@@ -118,27 +114,27 @@ impl RegistryClient for DockerClient {
             ref_str.clone(),
         ];
 
-        if !platforms.is_empty() {
+        if !opts.platforms.is_empty() {
             cmd_args.push("--platform".into());
-            cmd_args.push(platforms.join(","));
+            cmd_args.push(opts.platforms.join(","));
         }
 
-        for (k, v) in build_args {
+        for (k, v) in opts.build_args {
             cmd_args.push("--build-arg".into());
             cmd_args.push(format!("{}={}", k, v));
         }
 
-        for (k, v) in labels {
+        for (k, v) in opts.labels {
             cmd_args.push("--label".into());
             cmd_args.push(format!("{}={}", k, v));
         }
 
-        if let Some(df) = dockerfile {
+        if let Some(df) = opts.dockerfile {
             cmd_args.push("-f".into());
             cmd_args.push(df.to_string());
         }
 
-        cmd_args.push(context.to_string());
+        cmd_args.push(opts.context.to_string());
 
         let args_ref: Vec<&str> = cmd_args.iter().map(|s| s.as_str()).collect();
 

@@ -6,7 +6,7 @@ use tracing::info;
 use super::CommandContext;
 use crate::core::image_ref::ImageRef;
 use crate::core::tags::{Event, TagSet};
-use crate::registry::{DockerClient, RegistryClient};
+use crate::registry::{BuildOptions, DockerClient, RegistryClient};
 
 /// DanceArgs combines what's needed for both publish and promote flows.
 #[derive(Args, Debug)]
@@ -134,11 +134,13 @@ pub async fn run(ctx: CommandContext, args: DanceArgs) -> Result<()> {
                 digest = client
                     .push_image(
                         &primary_ref,
-                        &image_cfg.context,
-                        image_cfg.dockerfile.as_deref(),
-                        &build_args,
-                        &labels,
-                        &platforms,
+                        BuildOptions {
+                            context: &image_cfg.context,
+                            dockerfile: image_cfg.dockerfile.as_deref(),
+                            build_args: &build_args,
+                            labels: &labels,
+                            platforms: &platforms,
+                        },
                         ctx.dry_run,
                     )
                     .await?;
@@ -170,11 +172,13 @@ pub async fn run(ctx: CommandContext, args: DanceArgs) -> Result<()> {
             digest = client
                 .push_image(
                     &primary_ref,
-                    &image_cfg.context,
-                    image_cfg.dockerfile.as_deref(),
-                    &build_args,
-                    &labels,
-                    &platforms,
+                    BuildOptions {
+                        context: &image_cfg.context,
+                        dockerfile: image_cfg.dockerfile.as_deref(),
+                        build_args: &build_args,
+                        labels: &labels,
+                        platforms: &platforms,
+                    },
                     ctx.dry_run,
                 )
                 .await?;

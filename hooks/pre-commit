@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "--- cargo fmt --check"
+if ! cargo fmt --check; then
+  echo ""
+  echo "Format errors found. Run 'cargo fmt' then re-stage your changes."
+  exit 1
+fi
+
+echo "--- cargo clippy"
+if ! cargo clippy -- -D warnings; then
+  echo ""
+  echo "Clippy errors found. Fix the issues above then re-stage your changes."
+  exit 1
+fi
+
+echo "--- OK"

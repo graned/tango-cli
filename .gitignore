@@ -1,0 +1,28 @@
+# Build output
+/target/
+
+# Cargo lock is kept for binaries
+# Cargo.lock
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Editor
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test artifacts
+/tmp/

@@ -7,7 +7,7 @@ use crate::core::{
     image_ref::ImageRef,
     tags::{Event, TagSet},
 };
-use crate::registry::{DockerClient, RegistryClient};
+use crate::registry::{BuildOptions, DockerClient, RegistryClient};
 
 #[derive(Args, Debug)]
 pub struct PublishArgs {
@@ -95,11 +95,13 @@ pub async fn run(ctx: CommandContext, args: PublishArgs) -> Result<()> {
     let digest = client
         .push_image(
             &primary_ref,
-            &image_cfg.context,
-            dockerfile,
-            &build_args,
-            &labels,
-            &platforms,
+            BuildOptions {
+                context: &image_cfg.context,
+                dockerfile,
+                build_args: &build_args,
+                labels: &labels,
+                platforms: &platforms,
+            },
             ctx.dry_run,
         )
         .await?;
