@@ -1,0 +1,42 @@
+registry:
+  host: ghcr.io
+  namespace: my-org
+
+defaults:
+  tags:
+    sha_prefix: "sha-"
+    pr_prefix: "pr-"
+    main_tag: "main"
+    latest_tag: "latest"
+    publish_latest_on_merge: true
+
+packages:
+  api:
+    image:
+      name: api
+      context: ./services/api
+      dockerfile: ./services/api/Dockerfile
+      platforms:
+        - linux/amd64
+        - linux/arm64
+      build_args:
+        APP_ENV: production
+
+  worker:
+    image:
+      name: worker
+      context: ./services/worker
+      dockerfile: ./services/worker/Dockerfile
+      platforms:
+        - linux/amd64
+
+  frontend:
+    image:
+      name: frontend
+      context: ./frontend
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    defaults:
+      tags:
+        publish_latest_on_merge: false

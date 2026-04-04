@@ -1,0 +1,21 @@
+registry:
+  host: registry.gitlab.com
+  namespace: my-group/my-project
+
+defaults:
+  tags:
+    sha_prefix: "sha-"
+    pr_prefix: "mr-"
+    main_tag: "main"
+    latest_tag: "latest"
+    publish_latest_on_merge: true
+
+packages:
+  app:
+    image:
+      name: app
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+        - linux/arm64

@@ -1,0 +1,21 @@
+registry:
+  host: docker.io
+  namespace: my-dockerhub-org
+
+defaults:
+  tags:
+    sha_prefix: "sha-"
+    pr_prefix: "pr-"
+    main_tag: "main"
+    latest_tag: "latest"
+    publish_latest_on_merge: true
+
+packages:
+  app:
+    image:
+      name: app
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+        - linux/arm64

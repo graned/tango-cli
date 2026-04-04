@@ -1,0 +1,62 @@
+# GitLab CI pipeline using tango.
+#
+# Flow:
+#   MR    → build image, push sha-<sha> + mr-<n>
+#   merge → promote sha-<sha> to main + latest (no rebuild)
+#
+# Required CI/CD variables:
+#   CI_REGISTRY_USER     — gitlab-ci-token (set automatically)
+#   CI_REGISTRY_PASSWORD — $CI_JOB_TOKEN   (set automatically)
+
+stages:
+  - build
+  - promote
+
+.tango-setup: &tango-setup
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq curl
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --quiet
+    - source "$HOME/.cargo/env"
+    - cargo install --path . --locked
+    - docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+
+publish:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+  variables:
+    TANGO_REGISTRY_HOST: registry.gitlab.com
+    TANGO_REGISTRY_NAMESPACE: $CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME
+    TANGO_SHA: $CI_COMMIT_SHA
+    TANGO_PR_NUMBER: $CI_MERGE_REQUEST_IID
+  <<: *tango-setup
+  script:
+    - tango publish
+        --package app
+        --event pr
+        --sha "$TANGO_SHA"
+        --pr "$TANGO_PR_NUMBER"
+        --json
+
+promote:
+  stage: promote
+  image: docker:latest
+  services:
+    - docker:dind
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  variables:
+    TANGO_REGISTRY_HOST: registry.gitlab.com
+    TANGO_REGISTRY_NAMESPACE: $CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME
+    TANGO_SHA: $CI_COMMIT_SHA
+  <<: *tango-setup
+  script:
+    - tango promote
+        --package app
+        --sha "$TANGO_SHA"
+        --target-tag main
+        --target-tag latest
+        --json

@@ -6,14 +6,9 @@ on:
   pull_request:
     branches: [main]
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAMESPACE: ${{ github.repository_owner }}
-
 jobs:
-  # ── Build & test the tango CLI itself ──────────────────────────────────────
-  build-cli:
-    name: Build & Test tango CLI
+  ci:
+    name: CI
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,180 +29,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Check formatting
+      - name: cargo fmt --check
         run: cargo fmt --check
 
-      - name: Clippy
+      - name: cargo clippy
         run: cargo clippy -- -D warnings
 
-      - name: Build
-        run: cargo build --release
-
-      - name: Test
+      - name: cargo test
         run: cargo test
 
+      - name: cargo build --release
+        run: cargo build --release
+
       - name: Upload binary
+        if: github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: tango-linux-amd64
           path: target/release/tango
-
-  # ── Publish a service image on PR ─────────────────────────────────────────
-  publish-pr:
-    name: Publish (PR)
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    needs: build-cli
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download tango binary
-        uses: actions/download-artifact@v4
-        with:
-          name: tango-linux-amd64
-          path: ./bin
-
-      - name: Make tango executable
-        run: chmod +x ./bin/tango
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish API image (PR)
-        env:
-          TANGO_REGISTRY_HOST: ${{ env.REGISTRY }}
-          TANGO_REGISTRY_NAMESPACE: ${{ env.IMAGE_NAMESPACE }}
-          TANGO_EVENT: pr
-          TANGO_SHA: ${{ github.sha }}
-          TANGO_PR_NUMBER: ${{ github.event.number }}
-        run: |
-          ./bin/tango --package api publish \
-            --event pr \
-            --sha "$TANGO_SHA" \
-            --pr "$TANGO_PR_NUMBER" \
-            --json
-
-  # ── Promote to main/latest on merge ───────────────────────────────────────
-  promote-merge:
-    name: Promote (merge → main)
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: build-cli
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download tango binary
-        uses: actions/download-artifact@v4
-        with:
-          name: tango-linux-amd64
-          path: ./bin
-
-      - name: Make tango executable
-        run: chmod +x ./bin/tango
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Promote all packages to main/latest
-        env:
-          TANGO_REGISTRY_HOST: ${{ env.REGISTRY }}
-          TANGO_REGISTRY_NAMESPACE: ${{ env.IMAGE_NAMESPACE }}
-          TANGO_SHA: ${{ github.sha }}
-        run: |
-          for package in api worker frontend; do
-            echo "=== Promoting $package ==="
-            ./bin/tango --package "$package" promote \
-              --sha "$TANGO_SHA" \
-              --target-tag main \
-              --target-tag latest \
-              --json
-          done
-
-  # ── Detect affected packages (monorepo) ───────────────────────────────────
-  affected:
-    name: Detect Affected Packages
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    needs: build-cli
-    outputs:
-      packages: ${{ steps.detect.outputs.packages }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download tango binary
-        uses: actions/download-artifact@v4
-        with:
-          name: tango-linux-amd64
-          path: ./bin
-
-      - name: Make tango executable
-        run: chmod +x ./bin/tango
-
-      - name: Detect affected packages
-        id: detect
-        run: |
-          AFFECTED=$(./bin/tango affected \
-            --base "origin/${{ github.base_ref }}" \
-            --head HEAD \
-            --json | jq -c '.affected_packages')
-          echo "packages=$AFFECTED" >> "$GITHUB_OUTPUT"
-          echo "Affected: $AFFECTED"
-
-  # ── Run tango resolve to pin a digest ─────────────────────────────────────
-  resolve-example:
-    name: Resolve digest example
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: promote-merge
-    permissions:
-      packages: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download tango binary
-        uses: actions/download-artifact@v4
-        with:
-          name: tango-linux-amd64
-          path: ./bin
-
-      - name: Make tango executable
-        run: chmod +x ./bin/tango
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Resolve pinned digest for api:main
-        env:
-          TANGO_REGISTRY_HOST: ${{ env.REGISTRY }}
-          TANGO_REGISTRY_NAMESPACE: ${{ env.IMAGE_NAMESPACE }}
-        run: |
-          ./bin/tango --package api resolve --tag main --json
