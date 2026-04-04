@@ -151,7 +151,9 @@ pub async fn run(ctx: CommandContext, args: DanceArgs) -> Result<()> {
                     );
                 }
 
-                client.tag_image(&source, &mutable_tags, ctx.dry_run).await?;
+                client
+                    .tag_image(&source, &mutable_tags, ctx.dry_run)
+                    .await?;
                 digest = client
                     .get_digest(&primary_ref)
                     .await
