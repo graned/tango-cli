@@ -110,6 +110,10 @@ packages:
       name: api
       context: ./services/api
       dockerfile: ./services/api/Dockerfile
+      cache_from:
+        - type=registry,ref=ghcr.io/my-org/api:buildcache
+      cache_to:
+        - type=registry,ref=ghcr.io/my-org/api:buildcache,mode=max
       platforms:
         - linux/amd64
         - linux/arm64
@@ -191,6 +195,17 @@ tango publish --event <EVENT> --sha <SHA> [OPTIONS]
 | `--build-arg KEY=VAL` | | Extra Docker build arg (repeatable) |
 | `--label KEY=VAL` | | Extra Docker label (repeatable) |
 | `--platform <PLATFORM>` | | Target platform, e.g. `linux/amd64` (repeatable) |
+| `--cache-from <CACHE>` | | Buildx cache source (repeatable; replaces `image.cache_from`) |
+| `--cache-to <CACHE>` | | Buildx cache destination (repeatable; replaces `image.cache_to`) |
+
+Cache options also apply to builds performed by `tango dance` (including
+`--force-build`), not promotion-only runs. Each CLI list independently replaces
+its configured list; when omitted, the configured list is used. With neither
+configured nor CLI cache options, no cache flags are passed. Values are forwarded
+unchanged as separate Docker arguments; quote them in your shell. Buildx and the
+selected builder must support the chosen cache backend. Tango redacts cache
+values from command logs and hides build output when cache options are present
+because Buildx may echo credentials. Avoid embedding credentials in cache values.
 
 **Examples:**
 
@@ -209,6 +224,12 @@ tango publish --package api --event pr --sha abc123 --pr 42 \
 
 # JSON output
 tango publish --package api --event pr --sha abc123 --pr 42 --json
+
+# Override configured cache sources and destination
+tango dance --package api --event commit --sha abc123 \
+  --cache-from 'type=registry,ref=ghcr.io/my-org/api:branch-cache' \
+  --cache-from 'type=registry,ref=ghcr.io/my-org/api:buildcache' \
+  --cache-to 'type=registry,ref=ghcr.io/my-org/api:branch-cache,mode=max'
 ```
 
 **JSON output:**

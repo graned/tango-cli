@@ -88,6 +88,10 @@ pub struct ImageConfig {
     pub labels: HashMap<String, String>,
     #[serde(default)]
     pub platforms: Vec<String>,
+    #[serde(default)]
+    pub cache_from: Vec<String>,
+    #[serde(default)]
+    pub cache_to: Vec<String>,
 }
 
 /// Fully resolved config after merging root + package + env overrides

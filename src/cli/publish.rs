@@ -34,6 +34,14 @@ pub struct PublishArgs {
     /// Target platforms (e.g. linux/amd64,linux/arm64)
     #[arg(long)]
     pub platform: Vec<String>,
+
+    /// Buildx cache source (repeatable; replaces configured cache_from)
+    #[arg(long)]
+    pub cache_from: Vec<String>,
+
+    /// Buildx cache destination (repeatable; replaces configured cache_to)
+    #[arg(long)]
+    pub cache_to: Vec<String>,
 }
 
 pub async fn run(ctx: CommandContext, args: PublishArgs) -> Result<()> {
@@ -92,6 +100,16 @@ pub async fn run(ctx: CommandContext, args: PublishArgs) -> Result<()> {
     };
 
     let dockerfile = image_cfg.dockerfile.as_deref();
+    let cache_from = if args.cache_from.is_empty() {
+        &image_cfg.cache_from
+    } else {
+        &args.cache_from
+    };
+    let cache_to = if args.cache_to.is_empty() {
+        &image_cfg.cache_to
+    } else {
+        &args.cache_to
+    };
     let digest = client
         .push_image(
             &primary_ref,
@@ -101,6 +119,8 @@ pub async fn run(ctx: CommandContext, args: PublishArgs) -> Result<()> {
                 build_args: &build_args,
                 labels: &labels,
                 platforms: &platforms,
+                cache_from,
+                cache_to,
             },
             ctx.dry_run,
         )

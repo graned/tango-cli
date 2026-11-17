@@ -11,6 +11,8 @@ pub struct BuildOptions<'a> {
     pub build_args: &'a [(String, String)],
     pub labels: &'a [(String, String)],
     pub platforms: &'a [String],
+    pub cache_from: &'a [String],
+    pub cache_to: &'a [String],
 }
 
 #[async_trait]
