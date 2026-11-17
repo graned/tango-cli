@@ -35,6 +35,14 @@ pub struct DanceArgs {
     #[arg(long)]
     pub platform: Vec<String>,
 
+    /// Buildx cache source (repeatable; replaces configured cache_from)
+    #[arg(long)]
+    pub cache_from: Vec<String>,
+
+    /// Buildx cache destination (repeatable; replaces configured cache_to)
+    #[arg(long)]
+    pub cache_to: Vec<String>,
+
     /// For merge events: full source reference to promote from (tag or digest).
     /// If omitted, the sha-tag derived from --sha is used (e.g. sha-abc123def456).
     #[arg(long)]
@@ -96,6 +104,17 @@ pub async fn run(ctx: CommandContext, args: DanceArgs) -> Result<()> {
         args.platform.clone()
     };
 
+    let cache_from = if args.cache_from.is_empty() {
+        &image_cfg.cache_from
+    } else {
+        &args.cache_from
+    };
+    let cache_to = if args.cache_to.is_empty() {
+        &image_cfg.cache_to
+    } else {
+        &args.cache_to
+    };
+
     let digest: String;
     let primary_ref: ImageRef;
 
@@ -119,6 +138,8 @@ pub async fn run(ctx: CommandContext, args: DanceArgs) -> Result<()> {
                             build_args: &build_args,
                             labels: &labels,
                             platforms: &platforms,
+                            cache_from,
+                            cache_to,
                         },
                         ctx.dry_run,
                     )
@@ -193,6 +214,8 @@ pub async fn run(ctx: CommandContext, args: DanceArgs) -> Result<()> {
                         build_args: &build_args,
                         labels: &labels,
                         platforms: &platforms,
+                        cache_from,
+                        cache_to,
                     },
                     ctx.dry_run,
                 )

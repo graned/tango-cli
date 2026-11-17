@@ -52,16 +52,31 @@ impl DockerClient {
 
     /// Run a docker command and return (stdout, stderr, success).
     async fn run_docker(args: &[&str]) -> Result<(String, String, bool)> {
-        debug!("docker {}", args.join(" "));
+        let command_display = Self::redacted_command(args);
+        debug!(command = %command_display, "Running docker");
         let output = Command::new("docker")
             .args(args)
             .output()
             .await
-            .with_context(|| format!("Failed to run: docker {}", args.join(" ")))?;
+            .with_context(|| format!("Failed to run: docker {}", command_display))?;
 
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         Ok((stdout, stderr, output.status.success()))
+    }
+
+    fn redacted_command(args: &[&str]) -> String {
+        args.iter()
+            .enumerate()
+            .map(|(i, arg)| {
+                if i > 0 && matches!(args[i - 1], "--cache-from" | "--cache-to") {
+                    "[REDACTED]"
+                } else {
+                    *arg
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 
     /// Extract a digest from `docker buildx imagetools inspect --format '{{json .Manifest}}'` output.
@@ -119,6 +134,15 @@ impl RegistryClient for DockerClient {
             cmd_args.push(opts.platforms.join(","));
         }
 
+        for cache in opts.cache_from {
+            cmd_args.push("--cache-from".into());
+            cmd_args.push(cache.clone());
+        }
+        for cache in opts.cache_to {
+            cmd_args.push("--cache-to".into());
+            cmd_args.push(cache.clone());
+        }
+
         for (k, v) in opts.build_args {
             cmd_args.push("--build-arg".into());
             cmd_args.push(format!("{}={}", k, v));
@@ -139,17 +163,27 @@ impl RegistryClient for DockerClient {
         let args_ref: Vec<&str> = cmd_args.iter().map(|s| s.as_str()).collect();
 
         if dry_run {
-            info!("[dry-run] docker {}", cmd_args.join(" "));
+            info!(command = %Self::redacted_command(&args_ref), "[dry-run] docker");
             return Ok("sha256:dry-run-digest-not-real-000000000000000000000000000000".into());
         }
 
         info!("Building and pushing: {}", ref_str);
         let (stdout, stderr, ok) = Self::run_docker(&args_ref).await?;
-        debug!("build stdout: {}", stdout);
-        if !stderr.is_empty() {
-            debug!("build stderr: {}", stderr);
+        let has_cache = !opts.cache_from.is_empty() || !opts.cache_to.is_empty();
+        // Buildx output can echo credentials embedded in cache options.
+        if !has_cache {
+            debug!("build stdout: {}", stdout);
+            if !stderr.is_empty() {
+                debug!("build stderr: {}", stderr);
+            }
         }
         if !ok {
+            if has_cache {
+                bail!(
+                    "docker buildx build failed for {} (output hidden to protect cache credentials)",
+                    ref_str
+                );
+            }
             bail!(
                 "docker buildx build failed for {}: {}",
                 ref_str,

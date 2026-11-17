@@ -16,6 +16,10 @@ packages:
       name: app
       context: .
       dockerfile: Dockerfile
+      cache_from:
+        - type=registry,ref=ghcr.io/my-org/app:buildcache
+      cache_to:
+        - type=registry,ref=ghcr.io/my-org/app:buildcache,mode=max
       platforms:
         - linux/amd64
         - linux/arm64
